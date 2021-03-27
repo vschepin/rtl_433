@@ -188,6 +188,7 @@
     DECL(secplus_v1) \
     DECL(cavius) \
     DECL(tpms_jansite_solar) \
+    DECL(tpms_careud) \
     DECL(abmt) \
     DECL(tfa_marbella) \
     DECL(auriol_ahfl) \

@@ -179,6 +179,7 @@ add_library(r_433 STATIC
     devices/tpms_pmv107j.c
     devices/tpms_renault.c
     devices/tpms_toyota.c
+    devices/tpms_careud.c
     devices/ts_ft002.c
     devices/ttx201.c
     devices/vaillant_vrt340f.c
