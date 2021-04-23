@@ -30,9 +30,9 @@ Data layout (nibbles):
 - S: 16 bit sync word, 0x19cf
 - K: 4 bit XOR Key
 - F: 1 bit Flag - deflation alarm
-- F: 1 bit Unknown flag (may be MSB pressure or id bit?)
+- F: 1 bit Unknown flag (may be id bit?)
 - F: 1 bit Flag - battery low alarm
-- F: 1 bit Unknown flag (may be MSB pressure or id bit?)
+- F: 1 bit most significant bit of pressure
 - I: 8 bits ID
 - T: 8 bit Temperature (deg. C offset by 55)
 - P: 8 bit Pressure BAR * 64
@@ -75,7 +75,7 @@ static int tpms_careud_decode(r_device *decoder, bitbuffer_t *bitbuffer, unsigne
     }
 
     /* Check crc */
-    uint16_t crc = crc16(&b[2], 7, 0x8005, 0x0000);
+    uint16_t crc = crc16(&b[0], 9, 0x8005, 0x19cf);
     if ( crc != 0) {
         bitrow_printf(b, 7, "%s: sensor bad CRC: %02x -", __func__, crc);
         return DECODE_FAIL_MIC;
@@ -88,19 +88,22 @@ static int tpms_careud_decode(r_device *decoder, bitbuffer_t *bitbuffer, unsigne
     for(int i = 1; i < 5; i++){
         d[i]^=d[0];
     }
-    for(int i = 3; i >= 0; i--){
+    for(int i = 0; i < 4; i++){
         d[i]^=d[4];
     }
 
     id          = (d[1] << 8) | d[4];
     flags       = d[0] & 0x0f;
     temperature = d[2];
-    pressure    = d[3];
+    pressure    = d[3] | (d[0] & 0x01) << 8;
     sprintf(id_str, "%04x", id);
 #ifdef TPMS_CAREUD_SHOW_RAW
     sprintf(code_str, "%02x%02x%02x%02x%02x%02x%02x%02x%02x", b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8]);
     sprintf(data_str, "%02x%02x%02x%02x%02x", d[0], d[1], d[2], d[3], d[4]);
 #endif
+
+    float pressure_bar = 0.015698*pressure - 0.064878015;
+    if(pressure_bar < 0) pressure_bar = 0;
 
     /* clang-format off */
     data = data_make(
@@ -109,7 +112,7 @@ static int tpms_careud_decode(r_device *decoder, bitbuffer_t *bitbuffer, unsigne
             "id",               "",                 DATA_STRING, id_str,
             "flags",            "",                 DATA_INT, flags,
             "battery",          "",                 DATA_STRING, (flags & 0x02) ? "OK" : "LOW",
-            "pressure_BAR",     "Pressure",         DATA_FORMAT, "%.2f BAR", DATA_DOUBLE, (float)pressure / 64,
+            "pressure_BAR",     "Pressure",         DATA_FORMAT, "%.2f BAR", DATA_DOUBLE, pressure_bar,
             "pressure_loss",    "Pressure Loss",    DATA_STRING, (flags & 0x08) ? "OK" : "ALARM",
             "temperature_C",    "Temperature",      DATA_FORMAT, "%d C", DATA_INT, temperature - 55,
 #ifdef TPMS_CAREUD_SHOW_RAW
